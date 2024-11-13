@@ -331,12 +331,6 @@ static int pwm_led_esp32_set_cycles(const struct device *dev, uint32_t channel_i
 
 	pwm_led_esp32_duty_set(dev, channel);
 
-  ret = pwm_led_esp32_configure_pinctrl(dev);
-  if (ret < 0) {
- 		k_sem_give(&data->cmd_sem);
- 		return ret;
- 	}
-
 	k_sem_give(&data->cmd_sem);
 
 	return ret;
@@ -345,6 +339,7 @@ static int pwm_led_esp32_set_cycles(const struct device *dev, uint32_t channel_i
 
 int pwm_led_esp32_init(const struct device *dev)
 {
+  int ret;
 	const struct pwm_ledc_esp32_config *config = dev->config;
 
 	if (!device_is_ready(config->clock_dev)) {
@@ -354,6 +349,11 @@ int pwm_led_esp32_init(const struct device *dev)
 
 	/* Enable peripheral */
 	clock_control_on(config->clock_dev, config->clock_subsys);
+
+  ret = pwm_led_esp32_configure_pinctrl(dev);
+  if (ret < 0) {
+    return ret;
+  }
 
 	return 0;
 }
