@@ -331,11 +331,11 @@ static int pwm_led_esp32_set_cycles(const struct device *dev, uint32_t channel_i
 
 	pwm_led_esp32_duty_set(dev, channel);
 
-	ret = pwm_led_esp32_configure_pinctrl(dev);
-	if (ret < 0) {
-		k_sem_give(&data->cmd_sem);
-		return ret;
-	}
+  ret = pwm_led_esp32_configure_pinctrl(dev);
+  if (ret < 0) {
+ 		k_sem_give(&data->cmd_sem);
+ 		return ret;
+ 	}
 
 	k_sem_give(&data->cmd_sem);
 
