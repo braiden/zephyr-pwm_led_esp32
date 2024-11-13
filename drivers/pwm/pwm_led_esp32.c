@@ -282,6 +282,7 @@ static int pwm_led_esp32_set_cycles(const struct device *dev, uint32_t channel_i
 {
 	int ret;
 	uint64_t clk_freq;
+	uint32_t prev_freq;
 	struct pwm_ledc_esp32_data *data = (struct pwm_ledc_esp32_data *const)(dev)->data;
 	struct pwm_ledc_esp32_channel_config *channel = get_channel_config(dev, channel_idx);
 
@@ -296,6 +297,7 @@ static int pwm_led_esp32_set_cycles(const struct device *dev, uint32_t channel_i
 		return ret;
 	}
 
+	prev_freq = channel->freq;
 	channel->freq = (uint32_t) (clk_freq/period_cycles);
 	if (!channel->freq) {
 		channel->freq = 1;
@@ -303,21 +305,23 @@ static int pwm_led_esp32_set_cycles(const struct device *dev, uint32_t channel_i
 
 	k_sem_take(&data->cmd_sem, K_FOREVER);
 
-	ledc_hal_init(&data->hal, channel->speed_mode);
+	if (prev_freq != channel->freq) {
+		ledc_hal_init(&data->hal, channel->speed_mode);
 
-	ret = pwm_led_esp32_timer_config(channel);
-	if (ret < 0) {
-		k_sem_give(&data->cmd_sem);
+		ret = pwm_led_esp32_timer_config(channel);
+		if (ret < 0) {
+			k_sem_give(&data->cmd_sem);
+			return ret;
+		}
+
+		ret = pwm_led_esp32_timer_set(dev, channel);
+		if (ret < 0) {
+			k_sem_give(&data->cmd_sem);
 		return ret;
 	}
 
-	ret = pwm_led_esp32_timer_set(dev, channel);
-	if (ret < 0) {
-		k_sem_give(&data->cmd_sem);
-		return ret;
+		pwm_led_esp32_bind_channel_timer(dev, channel);
 	}
-
-	pwm_led_esp32_bind_channel_timer(dev, channel);
 
 	/* Update PWM duty  */
 
