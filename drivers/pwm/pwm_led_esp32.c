@@ -47,7 +47,6 @@ struct pwm_ledc_esp32_channel_config {
 	uint8_t resolution;
 	ledc_clk_src_t clock_src;
 	uint32_t duty_val;
-	bool is_timer_reset_required;
 };
 
 struct pwm_ledc_esp32_config {
@@ -252,12 +251,6 @@ static int pwm_led_esp32_timer_set(const struct device *dev,
 		ledc_hal_ls_timer_update(&data->hal, channel->timer_num);
 	}
 
-	/* reset low speed timer */
-	if (channel->is_timer_reset_required) {
-		ledc_hal_timer_rst(&data->hal, channel->timer_num);
-		channel->is_timer_reset_required = 0;
-	}
-
 	return 0;
 }
 
@@ -288,7 +281,6 @@ static int pwm_led_esp32_set_cycles(const struct device *dev, uint32_t channel_i
 	uint64_t clk_freq;
 	struct pwm_ledc_esp32_data *data = (struct pwm_ledc_esp32_data *const)(dev)->data;
 	struct pwm_ledc_esp32_channel_config *channel = get_channel_config(dev, channel_idx);
-	ledc_clk_src_t prev_clock_src = channel->clock_src;
 
 	if (!channel) {
 		LOG_ERR("Error getting channel %d", channel_idx);
@@ -314,11 +306,6 @@ static int pwm_led_esp32_set_cycles(const struct device *dev, uint32_t channel_i
 	if (ret < 0) {
 		k_sem_give(&data->cmd_sem);
 		return ret;
-	}
-
-	/* Reset the low-speed peripheral if the clock source has changed. */
-	if (prev_clock_src != channel->clock_src) {
-		channel->is_timer_reset_required = 1;
 	}
 
 	ret = pwm_led_esp32_timer_set(dev, channel);
@@ -360,6 +347,7 @@ int pwm_led_esp32_init(const struct device *dev)
 	for (int i = 0; i < config->channel_len; i++) {
 		struct pwm_ledc_esp32_channel_config *channel = &config->channel_config[i];
 		ledc_hal_init(&data->hal, channel->speed_mode);
+		ledc_hal_timer_rst(&data->hal, channel->timer_num);
 	}
 
 	ret = pwm_led_esp32_configure_pinctrl(dev);
@@ -386,7 +374,6 @@ PINCTRL_DT_INST_DEFINE(0);
 				      ? LEDC_LOW_SPEED_MODE                    \
 				      : !LEDC_LOW_SPEED_MODE,                  \
 		.clock_src = CLOCK_SOURCE,                                     \
-		.is_timer_reset_required = 1,                                  \
 	},
 
 static struct pwm_ledc_esp32_channel_config channel_config[] = {
